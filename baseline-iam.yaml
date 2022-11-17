@@ -1,0 +1,358 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template to create roles and policies in all the AWS accounts
+
+Parameters:
+  HyperproofExternalId:
+    Type: String
+    Description: Enter a random UUID that will be used by our service to assume the role
+    AllowedPattern: \S{8}-\S{4}-\S{4}-\S{4}-\S{12}
+  HyperproofRoleName:
+    Type: String
+    Description: Enter the role name that will be installed on your account. The default is HyperproofAccess-Role
+    Default: HyperproofAccess-Role
+
+Resources:
+  OktaReadOnly:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Okta-Idp-cross-account-role
+      Description: Assumed by Okta to find roles available in an account.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              # auth account (cultureamp-tech-wfidentity-production)
+              AWS: arn:aws:iam::737120425026:root
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/IAMReadOnlyAccess
+
+  AssumableRoleList:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: assumable_role_list
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              # cultureamp-meta
+              AWS: arn:aws:iam::082134150143:root                                          
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: list_iam_roles
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:ListRoles
+                  - iam:ListAccountAliases
+                Resource: "*"
+
+  JupiterOneConnector:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: jupiter_one_integration
+      Description: Role used by Jupiter One to ingest asset data.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::612791702201:root
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: 8c70affb-bb34-42fd-af4f-0762936d9e74
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/SecurityAudit
+      Policies:
+        - PolicyName: JupiterOneSecurityAudit
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: JupiterOneAll
+                Effect: Allow
+                Action:
+                  - access-analyzer:List*
+                  - batch:Describe*
+                  - batch:List*
+                  - cloudhsm:DescribeBackups
+                  - cloudhsm:DescribeClusters
+                  - cloudhsm:ListTags
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:List*
+                  - dynamodb:Describe*
+                  - dynamodb:List*
+                  - ecr:Describe*
+                  - ecr:GetLifecyclePolicy
+                  - ecr:GetRepositoryPolicy
+                  - ecr:GetRegistry*
+                  - ecr:List*
+                  - elasticache:List*
+                  - elasticfilesystem:Describe*
+                  - elasticmapreduce:List*
+                  - es:List*
+                  - inspector2:ListFindings
+                  - inspector2:ListCoverage
+                  - kinesis:Describe*
+                  - kinesis:List*
+                  - kms:GetKeyRotationStatus
+                  - lambda:GetFunction
+                  - macie2:Get*
+                  - macie2:List*
+                  - s3:GetObjectRetention
+                  - s3:GetObjectLegalHold
+                  - s3:Get*Configuration
+                  - shield:GetSubscriptionState
+                  - sns:GetTopicAttributes
+                  - sns:GetSubscriptionAttributes
+                  - sns:ListTopics
+                  - sns:ListSubscriptions
+                  - sns:ListTagsForResource
+                  - waf:List*
+                  - waf:Get*
+                  - waf-regional:List*
+                  - waf-regional:Get*
+                  - workspaces:List*
+                Resource: "*"
+              - Sid: JupiterOneApiGateway
+                Effect: Allow
+                Action: apigateway:GET
+                Resource: "arn:aws:apigateway:*::/*"
+
+  MetricsData:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: metrics_data
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              # cultureamp-security
+              AWS: arn:aws:iam::650497955587:root
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSBatchFullAccess
+        - arn:aws:iam::aws:policy/IAMReadOnlyAccess
+        - arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+      Policies:
+        - PolicyName: ListAccountsRegions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: ListAccountsRegions
+                Effect: Allow
+                Action:
+                  - ec2:DescribeRegions
+                  - organizations:ListAccounts
+                Resource: "*"
+              - Sid: InspectorPermissions
+                Effect: Allow
+                Action:
+                  - ecr:GetRegistry*
+                  - inspector2:ListFindings
+                  - inspector2:ListCoverage
+                Resource: "*"
+
+  NucleusConnector:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: nucleus_connector
+      Description: Role used by a Nucleus Project connector to ingest asset and scan data.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::050830310721:root
+            Action: sts:AssumeRole
+            Condition:
+              ForAnyValue:StringEquals:
+                sts:ExternalId:
+                  - 124f86-200b20-4de5bb-04bdc1
+                  - 1e8481-0186a0-4de5bb-04bdc1
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Policies:
+        - PolicyName: NucleusAWSConnectorPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: DescribeInstances
+                Effect: Allow
+                Action:
+                  - iam:ListAccountAliases
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeTags
+                  - inspector:ListAssessmentTemplates
+                Resource: "*"
+
+  HyperproofRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref HyperproofRoleName
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref HyperproofExternalId
+            Effect: Allow
+            Principal:
+              AWS: 030157059230
+      Policies:
+        - PolicyName: HyperproofFullPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: PermissionsForHyperproofHypersyncs
+                Effect: Allow
+                Action:
+                  - backup:GetBackupPlan
+                  - backup:ListBackupJobs
+                  - backup:ListBackupPlans
+                  - backup:ListBackupSelections
+                  - ec2:DescribeClientVpnEndpoints
+                  - ec2:DescribeImages
+                  - ec2:DescribeInstances
+                  - ec2:DescribeNetworkAcls
+                  - ec2:DescribeRegions
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSnapshots
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeVolumeStatus
+                  - ec2:DescribeVpcs
+                  - eks:DescribeCluster
+                  - eks:ListClusters
+                  - iam:GetAccountAuthorizationDetails
+                  - iam:GetAccountPasswordPolicy
+                  - iam:GetGroup
+                  - iam:GetUser
+                  - iam:ListGroupPolicies
+                  - iam:ListGroups
+                  - iam:ListRoles
+                  - iam:ListUsers
+                  - iam:ListVirtualMFADevices
+                  - organizations:ListAccounts
+                  - rds:DescribeDBClusters
+                  - rds:DescribeDBInstances
+                  - resource-groups:SearchResources
+                  - s3:GetBucketPolicyStatus
+                  - s3:GetBucketVersioning
+                  - s3:GetEncryptionConfiguration
+                  - s3:GetReplicationConfiguration
+                  - s3:ListAllMyBuckets
+                  - s3:ListBucket
+                  - securityhub:DescribeProducts
+                  - securityhub:DescribeStandards
+                  - securityhub:GetFindings
+                  - securityhub:GetInsights
+                  - securityhub:ListEnabledProductsForImport
+                  - tag:GetResources
+                Resource: "*"
+
+  # https://cultureamp.atlassian.net/browse/CSRE-1456
+  # Configure IAM Password policy with a CustomResource
+  IamPasswordPolicyLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:GetAccountPasswordPolicy
+                  - iam:DeleteAccountPasswordPolicy
+                  - iam:UpdateAccountPasswordPolicy
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  IamPasswordPolicyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt IamPasswordPolicyLambdaRole.Arn
+      Timeout: 10
+      Architectures:
+        - arm64
+      Code: 
+        ZipFile: |
+          import boto3
+          import cfnresponse
+
+          client = boto3.client('iam')
+          physical_resource_id = 'AccountPasswordPolicy'
+          INT_PARAMS = [
+            'MinimumPasswordLength',
+            'MaxPasswordAge',
+            'PasswordReusePrevention',
+          ]
+          BOOL_PARAMS = [
+            'RequireSymbols',
+            'RequireNumbers',
+            'RequireUppercaseCharacters',
+            'RequireLowercaseCharacters',
+            'AllowUsersToChangePassword',
+          ]
+
+          def lambda_handler(event, context):
+            try:
+              print("event:", event)
+              response = {}
+              request_type = event.get('RequestType')
+              if request_type == 'Create' or request_type == 'Update':
+                rp = event.get('ResourceProperties', {})
+                opts = dict()
+                for int_param in INT_PARAMS:
+                  if int_param in rp:
+                    opts[int_param] = int(rp[int_param])
+                for bool_param in BOOL_PARAMS:
+                  if bool_param in rp:
+                    opts[bool_param] = rp[bool_param] == 'true'
+                client.update_account_password_policy(**opts)
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, response, physicalResourceId=physical_resource_id)
+              else:
+                try:
+                  client.delete_account_password_policy()
+                except client.exceptions.NoSuchEntityException as e:
+                  print(f"No policy found when deleting: {e}")
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, response, physicalResourceId=physical_resource_id)
+            except Exception as e:
+              print(f'Failure during IAM Policy: {event} - Error: {e}')
+              cfnresponse.send(event, context, cfnresponse.FAILED, None, physicalResourceId=physical_resource_id, reason=str(e))
+
+  IamAccountPasswordPolicy:
+    Type: Custom::IamAccountPasswordPolicy
+    Properties:
+      ServiceToken: !GetAtt IamPasswordPolicyLambdaFunction.Arn
+      MinimumPasswordLength: 12
+      RequireSymbols: true
+      RequireNumbers: true
+      RequireUppercaseCharacters: true
+      RequireLowercaseCharacters: true
+      AllowUsersToChangePassword: true
+      MaxPasswordAge: 180
+      PasswordReusePrevention: 24
