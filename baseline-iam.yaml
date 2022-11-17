@@ -176,10 +176,8 @@ Resources:
               AWS: arn:aws:iam::050830310721:root
             Action: sts:AssumeRole
             Condition:
-              ForAnyValue:StringEquals:
-                sts:ExternalId:
-                  - 124f86-200b20-4de5bb-04bdc1
-                  - 1e8481-0186a0-4de5bb-04bdc1
+              StringEquals:
+                sts:ExternalId: 8c70affb-bb34-42fd-af4f-0762936d9e74
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
       Policies:
